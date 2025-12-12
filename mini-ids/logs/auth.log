@@ -1,22 +1,29 @@
-Dec  1 12:00:00 server sshd[1234]: Failed password for invalid user admin from 192.168.1.100 port 54321 ssh2
-Dec  1 12:00:05 server sshd[1235]: Failed password for admin from 192.168.1.100 port 54322 ssh2
-Dec  1 12:00:10 server sshd[1236]: Failed password for admin from 192.168.1.100 port 54323 ssh2
-Dec  1 12:00:15 server sshd[1237]: Failed password for admin from 192.168.1.100 port 54324 ssh2
-Dec  1 12:00:20 server sshd[1238]: Failed password for admin from 192.168.1.100 port 54325 ssh2
-Dec  1 12:00:25 server sshd[1239]: Failed password for admin from 192.168.1.100 port 54326 ssh2
-Dec  1 12:01:00 server sshd[1240]: Accepted password for admin from 192.168.1.101 port 55000 ssh2
-Dec  1 12:01:05 server sshd[1241]: Connection from 10.0.0.50 port 50000 ssh2
-Dec  1 12:02:00 server sshd[1242]: Failed password for invalid user root from 10.0.0.100 port 45000 ssh2
-Dec  1 12:02:05 server sshd[1243]: Failed password for invalid user root from 10.0.0.100 port 45001 ssh2
-Dec  1 12:02:10 server sshd[1244]: Failed password for invalid user root from 10.0.0.100 port 45002 ssh2
-Dec  1 12:02:15 server sshd[1245]: Failed password for invalid user root from 10.0.0.100 port 45003 ssh2
-Dec  1 12:02:20 server sshd[1246]: Failed password for invalid user root from 10.0.0.100 port 45004 ssh2
-Dec  1 12:02:25 server sshd[1247]: Failed password for invalid user root from 10.0.0.100 port 45005 ssh2
-Dec  1 12:03:00 server sshd[1248]: Failed password for invalid user test from 172.16.0.10 port 40000 ssh2
-Dec  1 12:03:05 server sshd[1249]: Failed password for test from 172.16.0.10 port 40001 ssh2
-Dec  1 12:03:10 server sshd[1250]: Failed password for test from 172.16.0.10 port 40002 ssh2
-Dec  1 12:03:15 server sshd[1251]: Failed password for test from 172.16.0.10 port 40003 ssh2
-Dec  1 12:03:20 server sshd[1252]: Failed password for test from 172.16.0.10 port 40004 ssh2
-Dec  1 12:03:25 server sshd[1253]: Failed password for test from 172.16.0.10 port 40005 ssh2
-Dec  1 12:04:00 server sshd[1254]: Disconnected from 203.0.113.5 port 30000 [preauth]
-Dec  1 12:04:05 server sshd[1255]: Connection closed by 203.0.113.6 port 30001 [preauth]
+Dec 12 16:42:57 ubuntu-server sshd[12340]: Failed password for invalid user admin from 192.168.1.100 port 50000 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12341]: Failed password for invalid user admin from 192.168.1.100 port 50001 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12342]: Failed password for invalid user admin from 192.168.1.100 port 50002 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12343]: Failed password for invalid user admin from 192.168.1.100 port 50003 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12344]: Failed password for invalid user admin from 192.168.1.100 port 50004 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12345]: Failed password for invalid user admin from 192.168.1.100 port 50005 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12346]: Failed password for invalid user admin from 192.168.1.100 port 50006 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12347]: Failed password for invalid user admin from 192.168.1.100 port 50007 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12348]: Failed password for invalid user admin from 192.168.1.100 port 50008 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[12349]: Failed password for invalid user admin from 192.168.1.100 port 50009 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[13000]: Failed password for invalid user admin' OR '1'='1 from 192.168.1.101 port 51000 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[13001]: Failed password for invalid user root'-- from 192.168.1.101 port 51001 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[13002]: Failed password for invalid user test' UNION SELECT * FROM users-- from 192.168.1.101 port 51002 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[14000]: Failed password for invalid user user; cat /etc/passwd from 192.168.1.102 port 52000 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[14001]: Failed password for invalid user admin | whoami from 192.168.1.102 port 52001 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[14002]: Failed password for invalid user test && ls -la from 192.168.1.102 port 52002 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[15000]: Failed password for invalid user ../../../root from 192.168.1.103 port 53000 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[15001]: Failed password for invalid user ..\..\..\windows from 192.168.1.103 port 53001 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[16000]: Accepted publickey for ubuntu from 192.168.1.10 port 60000 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[16001]: Accepted publickey for admin from 192.168.1.10 port 60001 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[16002]: Accepted publickey for devops from 192.168.1.10 port 60002 ssh2
+Dec 12 16:42:57 ubuntu-server sshd[17000]: Connection closed by 192.168.1.10 port 61000
+Dec 12 16:42:57 ubuntu-server sshd[17001]: Connection closed by 192.168.1.10 port 61001
+Dec 12 16:43:45 ubuntu-server sshd[20000]: Failed password for invalid user hacker from 10.0.0.99 port 70000 ssh2
+Dec 12 16:43:45 ubuntu-server sshd[20001]: Failed password for invalid user hacker from 10.0.0.99 port 70001 ssh2
+Dec 12 16:43:45 ubuntu-server sshd[20002]: Failed password for invalid user hacker from 10.0.0.99 port 70002 ssh2
+Dec 12 16:43:45 ubuntu-server sshd[20003]: Failed password for invalid user hacker from 10.0.0.99 port 70003 ssh2
+Dec 12 16:43:45 ubuntu-server sshd[20004]: Failed password for invalid user hacker from 10.0.0.99 port 70004 ssh2
+Dec 12 16:43:45 ubuntu-server sshd[20005]: Failed password for invalid user hacker from 10.0.0.99 port 70005 ssh2

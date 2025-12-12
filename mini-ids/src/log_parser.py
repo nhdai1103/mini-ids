@@ -34,9 +34,9 @@ class LogParser:
     # SSH log pattern - Failed password
     # Dec  1 12:34:56 server sshd[1234]: Failed password for invalid user admin from 192.168.1.1 port 54321 ssh2
     SSH_FAILED_PATTERN = re.compile(
-        r'(\w+\s+\d+\s+\d+:\d+:\d+)\s+[\w\-\.]+\s+sshd\[\d+\]:\s+'
+        r'(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+[\w\-\.]+\s+sshd\[\d+\]:\s+'
         r'(?P<event>Failed password|Invalid user|Accepted|Connection closed|Disconnected)\s+'
-        r'(?:for\s+(?:invalid user\s+)?(?P<username>\w+)\s+)?'
+        r'(?:for\s+(?:invalid user\s+)?(?P<username>[\w\'\"\;\|\&\.\-\/\\]+)\s+)?'
         r'from\s+(?P<ip>[\d\.]+)\s+port\s+\d+'
     )
     
@@ -90,17 +90,19 @@ class LogParser:
         if match:
             data = match.groupdict()
             return LogEntry(
-                timestamp=data[0] if data else "",
+                timestamp=data.get('timestamp', ''),
                 source_ip=data['ip'],
                 username=data.get('username'),
+                uri=data.get('event', ''),  # Lưu event type vào uri
                 log_type='ssh'
             )
         
         match = LogParser.SSH_CONNECTION_PATTERN.match(line)
         if match:
             data = match.groupdict()
+            timestamp_parts = line.split()[0:3]
             return LogEntry(
-                timestamp=line.split()[0:3],
+                timestamp=' '.join(timestamp_parts) if isinstance(timestamp_parts, list) else str(timestamp_parts),
                 source_ip=data['ip'],
                 log_type='ssh'
             )

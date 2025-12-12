@@ -15,13 +15,14 @@ from alert_manager import AlertManager
 
 
 class LogMonitorHandler(FileSystemEventHandler):
-    """Handler cho log file changes"""
+    """Handler cho log file changes - Tối ưu cho SSH logs"""
     
     def __init__(self):
         super().__init__()
         self.detection_engine = DetectionEngine()
         self.alert_manager = AlertManager()
-        self.processed_lines = {}  # Track line numbers to avoid reprocessing
+        self.processed_positions = {}  # Track file positions
+        self.last_inode = {}  # Track inodes for log rotation detection
     
     def on_modified(self, event):
         """Xử lý khi log file thay đổi"""
@@ -35,43 +36,57 @@ class LogMonitorHandler(FileSystemEventHandler):
         self.analyze_log_file(event.src_path)
     
     def analyze_log_file(self, file_path: str):
-        """Phân tích log file"""
+        """Phân tích log file - Hỗ trợ SSH logs và log rotation"""
         try:
             file_path = os.path.abspath(file_path)
             
-            # Đọc file
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()
+            # Kiểm tra file tồn tại
+            if not os.path.exists(file_path):
+                return
+            
+            # Phát hiện log rotation bằng inode
+            try:
+                current_inode = os.stat(file_path).st_ino
+                if file_path in self.last_inode and self.last_inode[file_path] != current_inode:
+                    print(f"🔄 Log rotation detected: {file_path}")
+                    self.processed_positions[file_path] = 0
+                self.last_inode[file_path] = current_inode
+            except:
+                pass
             
             # Xác định loại log
             if 'access' in file_path.lower():
                 log_type = 'apache' if 'apache' in file_path.lower() else 'nginx'
-            elif 'ssh' in file_path.lower():
+            elif any(name in file_path.lower() for name in ['auth', 'ssh', 'secure']):
                 log_type = 'ssh'
             else:
                 log_type = 'auto'
             
-            # Track lines đã process
-            if file_path not in self.processed_lines:
-                self.processed_lines[file_path] = 0
-            
-            start_idx = self.processed_lines[file_path]
-            
-            # Chỉ process dòng mới
-            for idx in range(start_idx, len(lines)):
-                line = lines[idx].strip()
-                if not line:
-                    continue
+            # Đọc từ vị trí đã xử lý
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                # Nhảy đến vị trí đã đọc
+                if file_path in self.processed_positions:
+                    f.seek(self.processed_positions[file_path])
                 
-                self._process_log_line(line, log_type)
+                # Đọc các dòng mới
+                new_lines = f.readlines()
+                current_position = f.tell()
+                
+                # Process từng dòng
+                for line in new_lines:
+                    line = line.strip()
+                    if line:
+                        self._process_log_line(line, log_type, file_path)
+                
+                # Cập nhật vị trí đã đọc
+                self.processed_positions[file_path] = current_position
             
-            # Update tracked lines
-            self.processed_lines[file_path] = len(lines)
-            
+        except PermissionError:
+            print(f"⚠️  Permission denied: {file_path}")
         except Exception as e:
             print(f"❌ Error analyzing {file_path}: {e}")
     
-    def _process_log_line(self, line: str, log_type: str):
+    def _process_log_line(self, line: str, log_type: str, file_path: str = None):
         """Xử lý một dòng log"""
         try:
             # Parse log line
@@ -95,17 +110,26 @@ class LogMonitorHandler(FileSystemEventHandler):
             # Kiểm tra attacks
             detections = self._detect_attacks(entry)
             
-            # Add alerts
+            # Add alerts và hiển thị chi tiết
             for detection in detections:
                 alert_id = self.alert_manager.add_alert(detection)
                 threat = "🔴" if detection.threat_level.value == "critical" else \
                          "🟠" if detection.threat_level.value == "high" else \
                          "🟡" if detection.threat_level.value == "medium" else "🟢"
                 
-                print(f"{threat} Alert #{alert_id}: {detection.attack_type} from {detection.source_ip}")
+                print(f"\n{threat} CẢNH BÁO TẤN CÔNG!")
+                print(f"   🆔 Alert: #{alert_id}")
+                print(f"   🎯 Loại: {detection.attack_type}")
+                print(f"   📍 IP: {detection.source_ip}")
+                if entry.username:
+                    print(f"   👤 User: {entry.username}")
+                print(f"   ⚠️  Mức độ: {detection.threat_level.value.upper()}")
+                if file_path:
+                    print(f"   📄 File: {os.path.basename(file_path)}")
+                print(f"   📝 Chi tiết: {detection.signature_name}")
         
         except Exception as e:
-            print(f"❌ Error processing line: {e}")
+            pass  # Bỏ qua lỗi parse để không spam console
     
     def _detect_attacks(self, entry):
         """Phát hiện các tấn công từ log entry"""
@@ -150,12 +174,24 @@ class LogMonitorHandler(FileSystemEventHandler):
         
         # 4. SSH-specific detection
         if entry.log_type == 'ssh':
-            if 'Failed' in entry.uri or entry.username:  # Failed login
+            # Kiểm tra brute-force cho SSH
+            if entry.username:  # Failed login với username
                 brute_force_detection = self.detection_engine.detect_brute_force(
-                    entry.source_ip, entry.username or 'unknown', True, entry.timestamp
+                    entry.source_ip, entry.timestamp
                 )
                 if brute_force_detection:
                     detections.append(brute_force_detection)
+            
+            # Kiểm tra payload trong username (SQL injection, command injection)
+            if entry.username:
+                sig = self.detection_engine.check_payload(entry.username)
+                if sig:
+                    detections.append(self.detection_engine._create_detection(
+                        timestamp=entry.timestamp,
+                        source_ip=entry.source_ip,
+                        signature=sig,
+                        raw_log=f"SSH username: {entry.username}"
+                    ))
         
         return detections
     
@@ -215,27 +251,62 @@ class LogMonitor:
 
 
 if __name__ == '__main__':
-    # Directories to monitor
+    print("""
+╔════════════════════════════════════════════════════════════╗
+║        🛡️  LOG MONITOR - MINI IDS 🛡️                    ║
+║     Giám sát Apache/Nginx/SSH logs real-time             ║
+╚════════════════════════════════════════════════════════════╝
+    """)
+    
+    # Directories to monitor - ưu tiên SSH logs trên Ubuntu
     log_dirs = [
-        'logs',  # Local logs directory
-        '/var/log',  # Linux system logs
-        'C:\\Windows\\System32\\winevt\\Logs',  # Windows event logs
+        'logs',  # Local logs directory (development)
     ]
     
-    # Filter existing directories
+    # Ubuntu/Debian SSH logs
+    ubuntu_ssh_logs = [
+        '/var/log/auth.log',      # SSH authentication logs
+        '/var/log/secure',         # CentOS/RHEL SSH logs
+    ]
+    
+    # Web server logs
+    web_logs = [
+        '/var/log/apache2',        # Apache on Ubuntu
+        '/var/log/nginx',          # Nginx logs
+        '/var/log/httpd',          # Apache on CentOS
+    ]
+    
+    # Kiểm tra các log paths có tồn tại không
     existing_dirs = [d for d in log_dirs if os.path.exists(d)]
     
-    # Add more directories if they exist
-    other_dirs = [
-        '/var/log/apache2',
-        '/var/log/nginx',
-        '/var/log/auth.log',
-        '/var/log/syslog',
-    ]
-    existing_dirs.extend([d for d in other_dirs if os.path.exists(d)])
+    # Thêm SSH log directories nếu tồn tại
+    for log_path in ubuntu_ssh_logs:
+        if os.path.exists(log_path):
+            log_dir = os.path.dirname(log_path) if os.path.isfile(log_path) else log_path
+            if log_dir not in existing_dirs:
+                existing_dirs.append(log_dir)
+            print(f"✅ Tìm thấy SSH log: {log_path}")
+    
+    # Thêm web log directories nếu tồn tại
+    for log_path in web_logs:
+        if os.path.exists(log_path):
+            if log_path not in existing_dirs:
+                existing_dirs.append(log_path)
+            print(f"✅ Tìm thấy Web log: {log_path}")
     
     if not existing_dirs:
-        existing_dirs = ['logs']  # Fallback to local logs
+        print("⚠️  Không tìm thấy log directories hệ thống")
+        print("📁 Sử dụng local logs directory: ./logs")
+        existing_dirs = ['logs']
+    
+    # Hiển thị hướng dẫn nếu không có quyền đọc system logs
+    if not any('/var/log' in d for d in existing_dirs):
+        print("\n💡 TIP: Để đọc SSH logs trên Ubuntu:")
+        print("   1. Chạy với sudo: sudo python3 monitor.py")
+        print("   2. Hoặc thêm user vào group: sudo usermod -a -G adm $USER")
+        print("   3. Sau đó logout và login lại\n")
+    
+    print(f"\n📂 Monitoring {len(existing_dirs)} directories...\n")
     
     monitor = LogMonitor(existing_dirs)
     monitor.start()
