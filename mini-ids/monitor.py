@@ -227,6 +227,34 @@ class LogMonitorHandler(FileSystemEventHandler):
         """Phát hiện các tấn công từ log entry"""
         detections = []
         
+        # SSH-specific detection (ưu tiên xử lý trước)
+        if entry.log_type == 'ssh':
+            # Kiểm tra brute-force cho SSH - trigger với mọi failed login
+            if 'Failed' in (entry.uri or '') or 'Authentication failure' in (entry.uri or ''):
+                brute_force_detection = self.detection_engine.detect_brute_force(
+                    source_ip=entry.source_ip,
+                    timestamp=entry.timestamp,
+                    username=entry.username or 'unknown',
+                    is_failed=True
+                )
+                if brute_force_detection:
+                    detections.append(brute_force_detection)
+            
+            # Kiểm tra payload trong username (SQL injection, command injection)
+            if entry.username:
+                sig = self.detection_engine.check_payload(entry.username)
+                if sig:
+                    detections.append(self.detection_engine._create_detection(
+                        timestamp=entry.timestamp,
+                        source_ip=entry.source_ip,
+                        signature=sig,
+                        raw_log=f"SSH username: {entry.username}"
+                    ))
+            
+            # Trả về luôn, không check thêm HTTP-specific detections
+            return detections
+        
+        # Web logs detection (Apache/Nginx)
         # 1. Check payload (URI) cho SQLi/XSS
         if entry.uri:
             sig = self.detection_engine.check_payload(entry.uri)
@@ -263,30 +291,6 @@ class LogMonitorHandler(FileSystemEventHandler):
                     signature=sig,
                     raw_log=f"User-Agent: {entry.user_agent}"
                 ))
-        
-        # 4. SSH-specific detection
-        if entry.log_type == 'ssh':
-            # Kiểm tra brute-force cho SSH - trigger với mọi failed login
-            if 'Failed' in (entry.uri or '') or 'Authentication failure' in (entry.uri or ''):
-                brute_force_detection = self.detection_engine.detect_brute_force(
-                    source_ip=entry.source_ip,
-                    timestamp=entry.timestamp,
-                    username=entry.username or 'unknown',
-                    is_failed=True
-                )
-                if brute_force_detection:
-                    detections.append(brute_force_detection)
-            
-            # Kiểm tra payload trong username (SQL injection, command injection)
-            if entry.username:
-                sig = self.detection_engine.check_payload(entry.username)
-                if sig:
-                    detections.append(self.detection_engine._create_detection(
-                        timestamp=entry.timestamp,
-                        source_ip=entry.source_ip,
-                        signature=sig,
-                        raw_log=f"SSH username: {entry.username}"
-                    ))
         
         return detections
     
