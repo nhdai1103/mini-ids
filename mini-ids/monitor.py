@@ -35,6 +35,89 @@ class LogMonitorHandler(FileSystemEventHandler):
         
         self.analyze_log_file(event.src_path)
     
+    def initial_scan(self, file_path: str):
+        """Scan toàn bộ log file lần đầu và hiển thị kết quả"""
+        try:
+            file_path = os.path.abspath(file_path)
+            if not os.path.exists(file_path):
+                return
+            
+            print(f"\n📖 Đang đọc file: {file_path}")
+            print("="*70)
+            
+            # Xác định loại log
+            if any(name in file_path.lower() for name in ['auth', 'ssh', 'secure']):
+                log_type = 'ssh'
+            elif 'access' in file_path.lower():
+                log_type = 'apache' if 'apache' in file_path.lower() else 'nginx'
+            else:
+                log_type = 'auto'
+            
+            total_lines = 0
+            parsed_entries = 0
+            ssh_failed = 0
+            ssh_success = 0
+            
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+                total_lines = len(lines)
+                
+                print(f"📊 Tổng số dòng: {total_lines}")
+                print(f"🔍 Đang phân tích...\n")
+                
+                # Đọc và hiển thị từng entry
+                for i, line in enumerate(lines[-50:], 1):  # Hiển thị 50 dòng cuối
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    entry = None
+                    if log_type == 'ssh':
+                        entry = LogParser.parse_ssh_log(line)
+                    elif log_type == 'apache':
+                        entry = LogParser.parse_apache_access_log(line)
+                    elif log_type == 'auto':
+                        if 'sshd' in line:
+                            entry = LogParser.parse_ssh_log(line)
+                        elif 'HTTP' in line:
+                            entry = LogParser.parse_apache_access_log(line)
+                    
+                    if entry:
+                        parsed_entries += 1
+                        
+                        # Hiển thị log entry
+                        if entry.log_type == 'ssh':
+                            if 'Failed' in (entry.uri or ''):
+                                ssh_failed += 1
+                                print(f"❌ [{entry.timestamp}] Failed login: {entry.username or 'unknown'} from {entry.source_ip}")
+                            elif 'Accepted' in (entry.uri or ''):
+                                ssh_success += 1
+                                print(f"✅ [{entry.timestamp}] Success login: {entry.username or 'unknown'} from {entry.source_ip}")
+                            else:
+                                print(f"📝 [{entry.timestamp}] SSH event from {entry.source_ip}: {entry.uri or 'connection'}")
+                        else:
+                            print(f"🌐 [{entry.timestamp}] {entry.method or ''} {entry.uri or ''} from {entry.source_ip}")
+                
+                # Lưu position để đọc tiếp từ đây
+                self.processed_positions[file_path] = f.tell()
+                self.last_inode[file_path] = os.stat(file_path).st_ino
+            
+            # Summary
+            print("\n" + "="*70)
+            print(f"📊 KẾT QUẢ PHÂN TÍCH:")
+            print(f"   • Tổng dòng: {total_lines}")
+            print(f"   • Parsed: {parsed_entries} entries")
+            if log_type == 'ssh':
+                print(f"   • Failed logins: {ssh_failed}")
+                print(f"   • Success logins: {ssh_success}")
+            print("="*70 + "\n")
+            
+        except PermissionError:
+            print(f"❌ Không có quyền đọc: {file_path}")
+            print(f"💡 Chạy với: sudo python3 monitor.py")
+        except Exception as e:
+            print(f"❌ Lỗi đọc file: {e}")
+    
     def analyze_log_file(self, file_path: str):
         """Phân tích log file - Hỗ trợ SSH logs và log rotation"""
         try:
@@ -106,6 +189,15 @@ class LogMonitorHandler(FileSystemEventHandler):
             
             if not entry:
                 return
+            
+            # Hiển thị log entry được đọc
+            if entry.log_type == 'ssh':
+                if 'Failed' in (entry.uri or ''):
+                    print(f"📥 [{entry.timestamp}] SSH Failed: {entry.username or 'unknown'}@{entry.source_ip}")
+                elif 'Accepted' in (entry.uri or ''):
+                    print(f"📥 [{entry.timestamp}] SSH Success: {entry.username or 'unknown'}@{entry.source_ip}")
+                else:
+                    print(f"📥 [{entry.timestamp}] SSH: {entry.source_ip}")
             
             # Kiểm tra attacks
             detections = self._detect_attacks(entry)
@@ -228,13 +320,25 @@ class LogMonitor:
         """Bắt đầu monitoring"""
         print("🔍 Starting Log Monitor...")
         
+        # Scan các log files có sẵn trước
+        ssh_log_files = [
+            '/var/log/auth.log',
+            '/var/log/secure',
+            'logs/auth.log'
+        ]
+        
+        for log_file in ssh_log_files:
+            if os.path.exists(log_file):
+                self.event_handler.initial_scan(log_file)
+        
+        # Bắt đầu real-time monitoring
         for log_dir in self.log_directories:
             if os.path.exists(log_dir):
                 self.observer.schedule(self.event_handler, log_dir, recursive=True)
                 print(f"   📁 Monitoring: {log_dir}")
         
         self.observer.start()
-        print("✅ Log Monitor started\n")
+        print("✅ Log Monitor started - Đang chờ SSH events mới...\n")
         
         try:
             while True:
