@@ -266,10 +266,13 @@ class LogMonitorHandler(FileSystemEventHandler):
         
         # 4. SSH-specific detection
         if entry.log_type == 'ssh':
-            # Kiểm tra brute-force cho SSH
-            if entry.username:  # Failed login với username
+            # Kiểm tra brute-force cho SSH - trigger với mọi failed login
+            if 'Failed' in (entry.uri or '') or 'Authentication failure' in (entry.uri or ''):
                 brute_force_detection = self.detection_engine.detect_brute_force(
-                    entry.source_ip, entry.timestamp
+                    source_ip=entry.source_ip,
+                    timestamp=entry.timestamp,
+                    username=entry.username or 'unknown',
+                    is_failed=True
                 )
                 if brute_force_detection:
                     detections.append(brute_force_detection)
