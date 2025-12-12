@@ -171,12 +171,12 @@ class DetectionEngine:
         
         return None
     
-    def detect_brute_force(self, source_ip: str, username: str, 
-                          is_failed: bool, timestamp: str) -> Optional[DetectionResult]:
+    def detect_brute_force(self, source_ip: str, timestamp: str, 
+                          username: str = 'unknown', is_failed: bool = True) -> Optional[DetectionResult]:
         """
         Phát hiện brute-force attack
         
-        Ngưỡng: > 5 failed login attempts từ cùng IP trong 5 phút
+        Ngưỡng: ≥ 5 failed login attempts từ cùng IP trong 60 giây
         """
         if source_ip not in self.brute_force_tracker:
             self.brute_force_tracker[source_ip] = []
@@ -188,34 +188,44 @@ class DetectionEngine:
             'failed': is_failed
         })
         
-        # Xóa old attempts (> 5 phút trước)
-        try:
-            now = datetime.now()
-            cutoff_time = now - timedelta(minutes=5)
-            
-            self.brute_force_tracker[source_ip] = [
-                attempt for attempt in self.brute_force_tracker[source_ip]
-                if self._is_recent(attempt['timestamp'], cutoff_time)
-            ]
-        except:
-            pass
+        # Xóa old attempts (> 60 giây trước)
+        cutoff_time = datetime.now() - timedelta(seconds=60)
+        
+        # Giữ lại chỉ attempts trong 60s gần nhất
+        recent_attempts = []
+        for attempt in self.brute_force_tracker[source_ip]:
+            try:
+                # Parse ISO timestamp hoặc BSD syslog timestamp
+                if 'T' in str(attempt['timestamp']):
+                    # ISO format: 2025-12-13T04:48:42.702117+07:00
+                    attempt_time = datetime.fromisoformat(attempt['timestamp'].replace('+07:00', ''))
+                else:
+                    # BSD format - sử dụng current year
+                    attempt_time = datetime.now()
+                
+                if attempt_time > cutoff_time or len(self.brute_force_tracker[source_ip]) <= 10:
+                    recent_attempts.append(attempt)
+            except:
+                recent_attempts.append(attempt)  # Giữ lại nếu parse fail
+        
+        self.brute_force_tracker[source_ip] = recent_attempts[-20:]  # Giữ max 20 attempts
         
         # Kiểm tra ngưỡng
-        failed_count = sum(1 for a in self.brute_force_tracker[source_ip] if a['failed'])
+        failed_count = sum(1 for a in self.brute_force_tracker[source_ip] if a.get('failed', True))
         
         if failed_count >= 5:
             return DetectionResult(
                 timestamp=timestamp,
                 source_ip=source_ip,
-                attack_type="BruteForce",
-                signature_name="SSH_BRUTE_FORCE",
+                attack_type="SSH_BRUTE_FORCE",
+                signature_name="SSH Brute Force Attack",
                 threat_level=ThreatLevel.HIGH,
                 details={
                     'failed_attempts': failed_count,
-                    'timeframe': '5 minutes',
-                    'usernames': list(set(a['username'] for a in self.brute_force_tracker[source_ip] if a['failed']))
+                    'timeframe': '60 seconds',
+                    'usernames': list(set(a.get('username', 'unknown') for a in self.brute_force_tracker[source_ip] if a.get('failed', True)))
                 },
-                raw_log=f"{failed_count} failed login attempts"
+                raw_log=f"Phát hiện {failed_count} lần đăng nhập thất bại trong 60s"
             )
         
         return None
@@ -237,16 +247,23 @@ class DetectionEngine:
         })
         
         # Xóa old entries (> 1 phút trước)
-        try:
-            now = datetime.now()
-            cutoff_time = now - timedelta(minutes=1)
-            
-            self.scan_tracker[source_ip] = [
-                entry for entry in self.scan_tracker[source_ip]
-                if self._is_recent(entry['timestamp'], cutoff_time)
-            ]
-        except:
-            pass
+        cutoff_time = datetime.now() - timedelta(minutes=1)
+        
+        # Giữ lại chỉ entries gần đây
+        recent_entries = []
+        for entry in self.scan_tracker[source_ip]:
+            try:
+                if 'T' in str(entry['timestamp']):
+                    # ISO format
+                    entry_time = datetime.fromisoformat(entry['timestamp'].replace('+07:00', ''))
+                    if entry_time > cutoff_time:
+                        recent_entries.append(entry)
+                else:
+                    recent_entries.append(entry)  # Giữ lại nếu không parse được
+            except:
+                recent_entries.append(entry)
+        
+        self.scan_tracker[source_ip] = recent_entries[-50:]  # Giữ max 50 entries
         
         # Kiểm tra số lượng unique URIs
         unique_uris = len(set(entry['uri'] for entry in self.scan_tracker[source_ip]))
@@ -272,18 +289,20 @@ class DetectionEngine:
                                        source_ip: str, uri: str,
                                        timestamp: str) -> Optional[DetectionResult]:
         """Phát hiện HTTP methods bất thường"""
-        sig = self.check_payload(method)
+        # Chỉ check các method không phổ biến
+        suspicious_methods = ['TRACE', 'TRACK', 'DEBUG', 'OPTIONS', 'CONNECT']
         
-        if sig:
+        if method and method.upper() in suspicious_methods:
             return DetectionResult(
                 timestamp=timestamp,
                 source_ip=source_ip,
                 attack_type="Reconnaissance",
-                signature_name=sig.name,
-                threat_level=sig.threat_level,
+                signature_name="SUSPICIOUS_METHOD",
+                threat_level=ThreatLevel.LOW,
                 details={
                     'method': method,
-                    'uri': uri
+                    'uri': uri,
+                    'reason': f'Suspicious HTTP method: {method}'
                 },
                 raw_log=f"{method} {uri}"
             )
@@ -294,14 +313,19 @@ class DetectionEngine:
     def _is_recent(timestamp_str: str, cutoff_time: datetime) -> bool:
         """Kiểm tra timestamp có gần đây không"""
         try:
-            # Try multiple formats
+            # ISO timestamp: 2025-12-13T04:48:42.702117+07:00
+            if 'T' in str(timestamp_str):
+                ts = datetime.fromisoformat(timestamp_str.replace('+07:00', ''))
+                return ts > cutoff_time
+            
+            # Try multiple BSD formats
             for fmt in ['%d/%b/%Y:%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%b %d %H:%M:%S']:
                 try:
                     ts = datetime.strptime(timestamp_str.split()[0], fmt)
                     return ts > cutoff_time
                 except:
                     continue
-            return True
+            return True  # Giữ lại nếu không parse được
         except:
             return True
     
