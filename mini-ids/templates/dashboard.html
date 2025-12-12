@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini IDS Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            color: #1e3c72;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+
+        .threat-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .threat-low {
+            background: #28a745;
+        }
+
+        .threat-medium {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .threat-high {
+            background: #fd7e14;
+        }
+
+        .threat-critical {
+            background: #dc3545;
+        }
+
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section h2 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #2a5298;
+            padding-bottom: 10px;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .alert-row {
+            cursor: pointer;
+        }
+
+        .alert-row:hover {
+            background: #e8f4f8;
+        }
+
+        .ip-address {
+            font-family: 'Courier New', monospace;
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .filter-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-container input,
+        .filter-container select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .filter-container button {
+            padding: 8px 16px;
+            background: #1e3c72;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .filter-container button:hover {
+            background: #2a5298;
+        }
+
+        .chart-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .mini-chart {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .mini-chart h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .bar-label {
+            width: 100px;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .bar-fill {
+            flex: 1;
+            height: 20px;
+            background: linear-gradient(90deg, #1e3c72, #2a5298);
+            border-radius: 3px;
+            margin: 0 10px;
+            position: relative;
+        }
+
+        .bar-value {
+            width: 40px;
+            text-align: right;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .refresh-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .refresh-btn:hover {
+            background: #218838;
+        }
+
+        .last-updated {
+            color: #999;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .detail-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .detail-modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .detail-item {
+            margin-bottom: 15px;
+        }
+
+        .detail-item strong {
+            color: #1e3c72;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .detail-item code {
+            background: #f0f0f0;
+            padding: 8px;
+            border-radius: 4px;
+            display: block;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <span class="status-indicator"></span>
+                🔍 Mini IDS Dashboard
+            </h1>
+            <button class="refresh-btn" onclick="refreshAll()">🔄 Refresh</button>
+        </header>
+
+        <!-- Statistics Grid -->
+        <div class="grid">
+            <div class="stat-card">
+                <h3>Total Alerts</h3>
+                <div class="value" id="total-alerts">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Critical Threats</h3>
+                <div class="value" id="critical-threats">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Blocked IPs</h3>
+                <div class="value" id="blocked-ips">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Attack Types</h3>
+                <div class="value" id="attack-types">0</div>
+            </div>
+        </div>
+
+        <!-- Recent Alerts Section -->
+        <div class="section">
+            <h2>⚠️ Recent Alerts</h2>
+            <div class="filter-container">
+                <select id="threat-filter" onchange="filterAlerts()">
+                    <option value="">All Threat Levels</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+                <input type="text" id="ip-filter" placeholder="Filter by IP..." onchange="filterAlerts()">
+                <button onclick="filterAlerts()">Search</button>
+            </div>
+            <div class="table-responsive">
+                <table id="alerts-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Source IP</th>
+                            <th>Attack Type</th>
+                            <th>Signature</th>
+                            <th>Threat Level</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-tbody">
+                        <tr>
+                            <td colspan="5" style="text-align: center;">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="last-updated">Last updated: <span id="alerts-updated">-</span></div>
+        </div>
+
+        <!-- Statistics Section -->
+        <div class="section">
+            <h2>📊 Statistics</h2>
+            <div class="chart-container">
+                <div class="mini-chart">
+                    <h4>Top Attack Types</h4>
+                    <div id="top-attacks"></div>
+                </div>
+                <div class="mini-chart">
+                    <h4>Top Blocked IPs</h4>
+                    <div id="top-ips"></div>
+                </div>
+                <div class="mini-chart">
+                    <h4>Threat Distribution</h4>
+                    <div id="threat-dist"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blocked IPs Section -->
+        <div class="section">
+            <h2>🚫 Top Blocked IPs</h2>
+            <div class="table-responsive">
+                <table id="blocked-ips-table">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Threat Count</th>
+                            <th>Threat Level</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="blocked-ips-tbody">
+                        <tr>
+                            <td colspan="5" style="text-align: center;">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="last-updated">Last updated: <span id="blocked-ips-updated">-</span></div>
+        </div>
+    </div>
+
+    <!-- Alert Detail Modal -->
+    <div class="detail-modal" id="detail-modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <h2 id="modal-title"></h2>
+            <div id="modal-details"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        async function loadStatistics() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics`);
+                const data = await response.json();
+
+                document.getElementById('total-alerts').textContent = data.total_alerts.toLocaleString();
+                document.getElementById('blocked-ips').textContent = data.total_blocked_ips.toLocaleString();
+                document.getElementById('attack-types').textContent = Object.keys(data.threat_distribution).length;
+
+                const criticalCount = data.threat_distribution['critical'] || 0;
+                document.getElementById('critical-threats').textContent = criticalCount.toLocaleString();
+
+                // Render top attacks
+                renderTopAttacks(data.top_attacks);
+                renderTopIPs(data.top_ips);
+                renderThreatDistribution(data.threat_distribution);
+            } catch (error) {
+                console.error('Error loading statistics:', error);
+            }
+        }
+
+        async function loadAlerts() {
+            try {
+                const threatFilter = document.getElementById('threat-filter').value;
+                const ipFilter = document.getElementById('ip-filter').value;
+
+                let url = `${API_BASE}/alerts?limit=50`;
+                if (threatFilter) url += `&threat_level=${threatFilter}`;
+                if (ipFilter) url += `&source_ip=${ipFilter}`;
+
+                const response = await fetch(url);
+                const alerts = await response.json();
+
+                const tbody = document.getElementById('alerts-tbody');
+                
+                if (alerts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No alerts found</td></tr>';
+                } else {
+                    tbody.innerHTML = alerts.map(alert => `
+                        <tr class="alert-row" onclick="showAlertDetail(${JSON.stringify(alert).replace(/"/g, '&quot;')})">
+                            <td>${alert.timestamp}</td>
+                            <td><span class="ip-address">${alert.source_ip}</span></td>
+                            <td>${alert.attack_type}</td>
+                            <td>${alert.signature_name}</td>
+                            <td><span class="threat-badge threat-${alert.threat_level}">${alert.threat_level.toUpperCase()}</span></td>
+                        </tr>
+                    `).join('');
+                }
+
+                document.getElementById('alerts-updated').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+
+        async function loadBlockedIPs() {
+            try {
+                const response = await fetch(`${API_BASE}/blocked-ips?limit=20`);
+                const ips = await response.json();
+
+                const tbody = document.getElementById('blocked-ips-tbody');
+                
+                if (ips.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No blocked IPs</td></tr>';
+                } else {
+                    tbody.innerHTML = ips.map(ip => `
+                        <tr>
+                            <td><span class="ip-address">${ip.ip_address}</span></td>
+                            <td>${ip.threat_count}</td>
+                            <td><span class="threat-badge threat-${ip.threat_level}">${ip.threat_level.toUpperCase()}</span></td>
+                            <td>${ip.first_seen}</td>
+                            <td>${ip.last_seen}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                document.getElementById('blocked-ips-updated').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Error loading blocked IPs:', error);
+            }
+        }
+
+        function renderTopAttacks(attacks) {
+            const container = document.getElementById('top-attacks');
+            const maxCount = Math.max(...attacks.map(a => a.count), 1);
+
+            container.innerHTML = attacks.map(attack => `
+                <div class="bar">
+                    <div class="bar-label">${attack.attack_type}</div>
+                    <div class="bar-fill" style="width: ${(attack.count / maxCount) * 100}%"></div>
+                    <div class="bar-value">${attack.count}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderTopIPs(ips) {
+            const container = document.getElementById('top-ips');
+            const maxCount = Math.max(...ips.map(i => i.threat_count), 1);
+
+            container.innerHTML = ips.map(ip => `
+                <div class="bar">
+                    <div class="bar-label">${ip.ip}</div>
+                    <div class="bar-fill" style="width: ${(ip.threat_count / maxCount) * 100}%"></div>
+                    <div class="bar-value">${ip.threat_count}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderThreatDistribution(distribution) {
+            const container = document.getElementById('threat-dist');
+            const total = Object.values(distribution).reduce((a, b) => a + b, 0);
+            const order = ['critical', 'high', 'medium', 'low'];
+
+            const sorted = order.filter(level => level in distribution).map(level => ({
+                level,
+                count: distribution[level]
+            }));
+
+            const maxCount = Math.max(...Object.values(distribution), 1);
+
+            container.innerHTML = sorted.map(item => `
+                <div class="bar">
+                    <div class="bar-label" style="text-transform: capitalize;">${item.level}</div>
+                    <div class="bar-fill" style="width: ${(item.count / maxCount) * 100}%"></div>
+                    <div class="bar-value">${item.count}</div>
+                </div>
+            `).join('');
+        }
+
+        function showAlertDetail(alert) {
+            const modal = document.getElementById('detail-modal');
+            const title = document.getElementById('modal-title');
+            const details = document.getElementById('modal-details');
+
+            title.textContent = `${alert.attack_type} - ${alert.source_ip}`;
+
+            let detailsHTML = `
+                <div class="detail-item">
+                    <strong>Timestamp:</strong>
+                    <code>${alert.timestamp}</code>
+                </div>
+                <div class="detail-item">
+                    <strong>Source IP:</strong>
+                    <code>${alert.source_ip}</code>
+                </div>
+                <div class="detail-item">
+                    <strong>Attack Type:</strong>
+                    <code>${alert.attack_type}</code>
+                </div>
+                <div class="detail-item">
+                    <strong>Signature:</strong>
+                    <code>${alert.signature_name}</code>
+                </div>
+                <div class="detail-item">
+                    <strong>Threat Level:</strong>
+                    <span class="threat-badge threat-${alert.threat_level}">${alert.threat_level.toUpperCase()}</span>
+                </div>
+            `;
+
+            try {
+                const details_obj = JSON.parse(alert.details);
+                detailsHTML += `
+                    <div class="detail-item">
+                        <strong>Details:</strong>
+                        <code>${JSON.stringify(details_obj, null, 2)}</code>
+                    </div>
+                `;
+            } catch (e) {
+                detailsHTML += `
+                    <div class="detail-item">
+                        <strong>Details:</strong>
+                        <code>${alert.details}</code>
+                    </div>
+                `;
+            }
+
+            detailsHTML += `
+                <div class="detail-item">
+                    <strong>Raw Log:</strong>
+                    <code>${alert.raw_log}</code>
+                </div>
+            `;
+
+            details.innerHTML = detailsHTML;
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').classList.remove('active');
+        }
+
+        function filterAlerts() {
+            loadAlerts();
+        }
+
+        function refreshAll() {
+            loadStatistics();
+            loadAlerts();
+            loadBlockedIPs();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshAll();
+            // Refresh every 10 seconds
+            setInterval(refreshAll, 10000);
+        });
+
+        // Close modal on outside click
+        document.getElementById('detail-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'detail-modal') closeModal();
+        });
+    </script>
+</body>
+</html>

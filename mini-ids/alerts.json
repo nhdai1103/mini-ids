@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "timestamp": "01/Dec/2024:12:01:02 +0000",
+    "source_ip": "10.0.0.50",
+    "attack_type": "SQLi",
+    "signature_name": "SQLi_COMMENT",
+    "threat_level": "medium",
+    "details": "{\"signature\": \"SQLi_COMMENT\"}",
+    "raw_log": "/search.php?q=1';"
+  },
+  {
+    "id": 2,
+    "timestamp": "01/Dec/2024:12:02:00 +0000",
+    "source_ip": "172.16.0.25",
+    "attack_type": "XSS",
+    "signature_name": "XSS_SCRIPT_TAG",
+    "threat_level": "high",
+    "details": "{\"signature\": \"XSS_SCRIPT_TAG\"}",
+    "raw_log": "/comments.php?text=<script>alert('xss')</script>"
+  },
+  {
+    "id": 3,
+    "timestamp": "01/Dec/2024:12:03:00 +0000",
+    "source_ip": "203.0.113.0",
+    "attack_type": "PathTraversal",
+    "signature_name": "PATH_TRAVERSAL",
+    "threat_level": "high",
+    "details": "{\"signature\": \"PATH_TRAVERSAL\"}",
+    "raw_log": "/../../etc/passwd"
+  },
+  {
+    "id": 4,
+    "timestamp": "01/Dec/2024:12:03:01 +0000",
+    "source_ip": "203.0.113.0",
+    "attack_type": "PathTraversal",
+    "signature_name": "PATH_TRAVERSAL",
+    "threat_level": "high",
+    "details": "{\"signature\": \"PATH_TRAVERSAL\"}",
+    "raw_log": "/..%2f..%2fetc%2fpasswd"
+  },
+  {
+    "id": 5,
+    "timestamp": "01/Dec/2024:12:03:02 +0000",
+    "source_ip": "203.0.113.0",
+    "attack_type": "PathTraversal",
+    "signature_name": "PATH_TRAVERSAL",
+    "threat_level": "high",
+    "details": "{\"signature\": \"PATH_TRAVERSAL\"}",
+    "raw_log": "/var/www/../../etc/shadow"
+  },
+  {
+    "id": 6,
+    "timestamp": "01/Dec/2024:12:05:00 +0000",
+    "source_ip": "198.51.100.50",
+    "attack_type": "SQLi",
+    "signature_name": "SQLi_COMMENT",
+    "threat_level": "medium",
+    "details": "{\"signature\": \"SQLi_COMMENT\"}",
+    "raw_log": "/admin/page.php?id=1;whoami"
+  },
+  {
+    "id": 7,
+    "timestamp": "01/Dec/2024:12:05:02 +0000",
+    "source_ip": "198.51.100.50",
+    "attack_type": "CommandInjection",
+    "signature_name": "CMD_INJECTION",
+    "threat_level": "high",
+    "details": "{\"signature\": \"CMD_INJECTION\"}",
+    "raw_log": "User-Agent: curl|bash"
+  },
+  {
+    "id": 8,
+    "timestamp": "11/Dec/2025:10:10:14 +0700",
+    "source_ip": "10.10.10.5",
+    "attack_type": "Reconnaissance",
+    "signature_name": "PORT_SCAN",
+    "threat_level": "medium",
+    "details": "{\"signature\": \"PORT_SCAN\"}",
+    "raw_log": "/wp-admin"
+  },
+  {
+    "id": 9,
+    "timestamp": "11/Dec/2025:10:10:17 +0700",
+    "source_ip": "45.82.19.23",
+    "attack_type": "SQLi",
+    "signature_name": "SQLi_COMMENT",
+    "threat_level": "medium",
+    "details": "{\"signature\": \"SQLi_COMMENT\"}",
+    "raw_log": "/login?user=admin'--"
+  },
+  {
+    "id": 10,
+    "timestamp": "11/Dec/2025:10:10:20 +0700",
+    "source_ip": "102.44.1.20",
+    "attack_type": "XSS",
+    "signature_name": "XSS_SCRIPT_TAG",
+    "threat_level": "high",
+    "details": "{\"signature\": \"XSS_SCRIPT_TAG\"}",
+    "raw_log": "/profile?name=<script>alert(1)</script>"
+  },
+  {
+    "id": 11,
+    "timestamp": "11/Dec/2025:10:10:25 +0700",
+    "source_ip": "55.2.33.10",
+    "attack_type": "SQLi",
+    "signature_name": "SQLi_COMMENT",
+    "threat_level": "medium",
+    "details": "{\"signature\": \"SQLi_COMMENT\"}",
+    "raw_log": "/ping?host=google.com;cat"
+  },
+  {
+    "id": 12,
+    "timestamp": "11/Dec/2025:10:10:30 +0700",
+    "source_ip": "188.31.40.4",
+    "attack_type": "PathTraversal",
+    "signature_name": "PATH_TRAVERSAL",
+    "threat_level": "high",
+    "details": "{\"signature\": \"PATH_TRAVERSAL\"}",
+    "raw_log": "/view?file=../../../../etc/passwd"
+  }
+]
