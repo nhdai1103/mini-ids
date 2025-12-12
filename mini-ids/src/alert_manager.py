@@ -65,22 +65,40 @@ class AlertManager:
         conn.commit()
         conn.close()
     
-    def add_alert(self, detection: DetectionResult) -> int:
+    def add_alert(self, detection) -> int:
         """
         Thêm cảnh báo mới
+        
+        Args:
+            detection: DetectionResult object hoặc dict
         
         Returns:
             Alert ID
         """
-        alert = {
-            'timestamp': detection.timestamp,
-            'source_ip': detection.source_ip,
-            'attack_type': detection.attack_type,
-            'signature_name': detection.signature_name,
-            'threat_level': detection.threat_level.value,
-            'details': json.dumps(detection.details),
-            'raw_log': detection.raw_log
-        }
+        # Xử lý cả DetectionResult object và dict
+        if hasattr(detection, 'threat_level'):
+            # DetectionResult object
+            threat_level_value = detection.threat_level.value if hasattr(detection.threat_level, 'value') else str(detection.threat_level)
+            alert = {
+                'timestamp': detection.timestamp,
+                'source_ip': detection.source_ip,
+                'attack_type': detection.attack_type,
+                'signature_name': detection.signature_name,
+                'threat_level': threat_level_value,
+                'details': json.dumps(detection.details) if hasattr(detection, 'details') else '{}',
+                'raw_log': detection.raw_log if hasattr(detection, 'raw_log') else ''
+            }
+        else:
+            # Dict
+            alert = {
+                'timestamp': detection.get('timestamp', ''),
+                'source_ip': detection.get('source_ip', ''),
+                'attack_type': detection.get('attack_type', ''),
+                'signature_name': detection.get('signature_name', ''),
+                'threat_level': detection.get('threat_level', 'MEDIUM'),
+                'details': json.dumps(detection.get('details', {})) if isinstance(detection.get('details'), dict) else detection.get('details', '{}'),
+                'raw_log': detection.get('raw_log', '')
+            }
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -94,10 +112,13 @@ class AlertManager:
         alert_id = cursor.lastrowid
         
         # Update blocked IPs
-        self._update_blocked_ip(cursor, detection.source_ip, detection.threat_level)
+        source_ip = detection.source_ip if hasattr(detection, 'source_ip') else detection.get('source_ip', '')
+        threat_level = detection.threat_level if hasattr(detection, 'threat_level') else alert['threat_level']
+        self._update_blocked_ip(cursor, source_ip, threat_level)
         
         # Update attack stats
-        self._update_attack_stats(cursor, detection.attack_type, detection.threat_level)
+        attack_type = detection.attack_type if hasattr(detection, 'attack_type') else detection.get('attack_type', '')
+        self._update_attack_stats(cursor, attack_type, threat_level)
         
         conn.commit()
         conn.close()
