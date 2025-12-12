@@ -31,20 +31,35 @@ class LogParser:
     # Nginx access log pattern (tương tự Apache)
     NGINX_PATTERN = APACHE_PATTERN
     
-    # SSH log pattern - Failed password
-    # Dec  1 12:34:56 server sshd[1234]: Failed password for invalid user admin from 192.168.1.1 port 54321 ssh2
+    # SSH log pattern - Failed password (hỗ trợ cả BSD và ISO timestamp)
+    # BSD: Dec  1 12:34:56 server sshd[1234]: Failed password for invalid user admin from 192.168.1.1 port 54321 ssh2
+    # ISO: 2025-12-13T04:19:57.569380+07:00 Dai sshd[766]: Failed password for invalid user fakeuser from 127.0.0.1 port 57990 ssh2
     SSH_FAILED_PATTERN = re.compile(
-        r'(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+[\w\-\.]+\s+sshd\[\d+\]:\s+'
-        r'(?P<event>Failed password|Invalid user|Accepted|Connection closed|Disconnected)\s+'
+        r'^(?P<timestamp>(?:\d{4}-\d{2}-\d{2}T[\d:.+-]+|\w+\s+\d+\s+\d+:\d+:\d+))\s+'
+        r'(?P<hostname>[\w\-\.]+)\s+sshd\[\d+\]:\s+'
+        r'(?P<event>Failed password|Invalid user|Accepted[^:]*|Connection closed|Disconnected)\s+'
         r'(?:for\s+(?:invalid user\s+)?(?P<username>[\w\'\"\;\|\&\.\-\/\\]+)\s+)?'
-        r'from\s+(?P<ip>[\d\.]+)\s+port\s+\d+'
+        r'(?:from\s+|by\s+(?:invalid user\s+[\w]+\s+)?)?'
+        r'(?P<ip>[\d\.]+)\s+port\s+\d+',
+        re.IGNORECASE
     )
     
-    # SSH log pattern - SSH connection
+    # SSH log pattern - Authentication failure (pam_unix)
+    SSH_AUTH_FAILURE_PATTERN = re.compile(
+        r'^(?P<timestamp>(?:\d{4}-\d{2}-\d{2}T[\d:.+-]+|\w+\s+\d+\s+\d+:\d+:\d+))\s+'
+        r'(?P<hostname>[\w\-\.]+)\s+sshd\[\d+\]:\s+'
+        r'(?:pam_unix\(sshd:auth\):\s+)?authentication failure.*rhost=(?P<ip>[\d\.]+)',
+        re.IGNORECASE
+    )
+    
+    # SSH log pattern - Connection events
     SSH_CONNECTION_PATTERN = re.compile(
-        r'(\w+\s+\d+\s+\d+:\d+:\d+)\s+[\w\-\.]+\s+sshd\[\d+\]:\s+'
+        r'^(?P<timestamp>(?:\d{4}-\d{2}-\d{2}T[\d:.+-]+|\w+\s+\d+\s+\d+:\d+:\d+))\s+'
+        r'(?P<hostname>[\w\-\.]+)\s+sshd\[\d+\]:\s+'
         r'(?P<event>Connection from|Connection closed|Disconnected from)\s+'
-        r'(?P<ip>[\d\.]+)\s+port\s+\d+'
+        r'(?:invalid user\s+(?P<username>[\w]+)\s+)?'
+        r'(?P<ip>[\d\.]+)\s+port\s+\d+',
+        re.IGNORECASE
     )
 
     @staticmethod
@@ -85,7 +100,8 @@ class LogParser:
     
     @staticmethod
     def parse_ssh_log(line: str) -> Optional[LogEntry]:
-        """Parse SSH log"""
+        """Parse SSH log - Hỗ trợ nhiều định dạng"""
+        # Thử pattern Failed password/Accepted/Invalid user
         match = LogParser.SSH_FAILED_PATTERN.match(line)
         if match:
             data = match.groupdict()
@@ -97,13 +113,26 @@ class LogParser:
                 log_type='ssh'
             )
         
+        # Thử pattern Authentication failure
+        match = LogParser.SSH_AUTH_FAILURE_PATTERN.match(line)
+        if match:
+            data = match.groupdict()
+            return LogEntry(
+                timestamp=data.get('timestamp', ''),
+                source_ip=data['ip'],
+                uri='Authentication failure',
+                log_type='ssh'
+            )
+        
+        # Thử pattern Connection events
         match = LogParser.SSH_CONNECTION_PATTERN.match(line)
         if match:
             data = match.groupdict()
-            timestamp_parts = line.split()[0:3]
             return LogEntry(
-                timestamp=' '.join(timestamp_parts) if isinstance(timestamp_parts, list) else str(timestamp_parts),
+                timestamp=data.get('timestamp', ''),
                 source_ip=data['ip'],
+                username=data.get('username'),
+                uri=data.get('event', 'Connection'),
                 log_type='ssh'
             )
         
